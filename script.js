@@ -181,7 +181,7 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     };
 
-    const performanceProfile = getPerformanceProfile();
+    let performanceProfile = getPerformanceProfile();
     const sceneCache = {
         cityRows: [],
         skyBridges: [],
@@ -204,7 +204,11 @@ document.addEventListener("DOMContentLoaded", () => {
         ticking: false,
         lightningTimer: null,
         lastRenderKey: "",
+        lastUIKey: "",
+        sceneVisible: true,
+        geometry: { top: 0, travel: 1, conclusionTop: Infinity },
         resizeTimer: null,
+        viewportWidth: window.innerWidth,
         quiz: {
             index: 0,
             score: 0,
@@ -219,6 +223,9 @@ document.addEventListener("DOMContentLoaded", () => {
         buildSceneLayers();
         bindEvents();
         setupQuiz();
+        measureTimeline();
+        document.fonts?.ready.then(() => { measureTimeline(); updateYearFromScroll(); render(true); });
+        window.addEventListener("load", measureTimeline, { once: true });
         setScenario("ignore", false);
         updateYearFromScroll();
         render(true);
@@ -262,6 +269,7 @@ document.addEventListener("DOMContentLoaded", () => {
             state.ticking = true;
             requestAnimationFrame(() => {
                 updateYearFromScroll();
+                updateTimelineNavVisibility();
                 render();
                 state.ticking = false;
             });
@@ -270,7 +278,14 @@ document.addEventListener("DOMContentLoaded", () => {
         window.addEventListener("resize", () => {
             clearTimeout(state.resizeTimer);
             state.resizeTimer = window.setTimeout(() => {
-                buildSceneLayers();
+                // Mobile browser chrome changes height during scrolling; keep the scene.
+                if (state.viewportWidth !== window.innerWidth) {
+                    state.viewportWidth = window.innerWidth;
+                    performanceProfile = getPerformanceProfile();
+                    dom.body.classList.toggle("lite-effects", performanceProfile.liteEffects);
+                    buildSceneLayers();
+                }
+                measureTimeline();
                 updateYearFromScroll();
                 render(true);
             }, 120);
@@ -496,16 +511,26 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     function updateYearFromScroll() {
-        const rect = dom.timelineSpacer.getBoundingClientRect();
-        const total = Math.max(1, rect.height - window.innerHeight);
-        const progress = clamp((-rect.top) / total, 0, 1);
+        const progress = clamp((window.scrollY - state.geometry.top) / state.geometry.travel, 0, 1);
 
         state.progress = progress;
         state.year = Math.round(START_YEAR + progress * YEARS);
     }
 
+    // Read geometry only when layout changes, before any scene style writes.
+    function measureTimeline() {
+        const rect = dom.timelineSpacer.getBoundingClientRect();
+        state.geometry = {
+            top: rect.top + window.scrollY,
+            travel: Math.max(1, rect.height - window.innerHeight),
+            conclusionTop: dom.conclusionSection.getBoundingClientRect().top + window.scrollY
+        };
+        updateTimelineNavVisibility();
+    }
+
     function render(force = false) {
-        const scene = getSceneState(state.year, state.scenario);
+        if (!force && !state.sceneVisible) return;
+        const scene = getSceneState(state.year, state.scenario, state.progress);
         const renderKey = `${scene.scenario}:${scene.year}:${scene.progress.toFixed(performanceProfile.renderPrecision)}`;
 
         if (!force && state.lastRenderKey === renderKey) return;
@@ -514,13 +539,16 @@ document.addEventListener("DOMContentLoaded", () => {
         state.progress = scene.progress;
         state.degradation = scene.degradation;
 
-        dom.yearNumber.textContent = String(scene.year);
-        dom.progressBar.style.width = `${scene.progress * 100}%`;
-
-        updateNavDots(scene.year);
-        updateMilestone(scene);
-        updateTimelineNavVisibility();
-        updateStats(scene.stats);
+        dom.progressBar.style.transform = `scaleX(${scene.progress})`;
+        const uiKey = `${scene.scenario}:${scene.year}`;
+        if (force || state.lastUIKey !== uiKey) {
+            state.lastUIKey = uiKey;
+            dom.yearNumber.textContent = String(scene.year);
+            updateNavDots(scene.year);
+            updateMilestone(scene);
+            updateStats(scene.stats);
+            syncAmbientAudio(scene, false);
+        }
         updateCity(scene);
         updateSkyBridges(scene);
         updateWindmills(scene);
@@ -537,11 +565,10 @@ document.addEventListener("DOMContentLoaded", () => {
         updateAnimalShowcase(scene);
         updateSky(scene);
 
-        syncAmbientAudio(scene, false);
+        updateEffectVisibility();
     }
 
-    function getSceneState(year, scenario) {
-        const progress = clamp((year - START_YEAR) / YEARS, 0, 1);
+    function getSceneState(year, scenario, progress = clamp((year - START_YEAR) / YEARS, 0, 1)) {
         const degradation = scenario === "ignore" ? smoothstep(progress) : 0;
         const stats = calculateStats(year, scenario, progress);
         return { year, progress, degradation, stats, scenario };
@@ -609,8 +636,10 @@ document.addEventListener("DOMContentLoaded", () => {
     function updateTimelineNavVisibility() {
         if (!dom.conclusionSection) return;
 
-        const rect = dom.conclusionSection.getBoundingClientRect();
-        const hidden = rect.top <= window.innerHeight * 0.78;
+        state.sceneVisible = window.scrollY + window.innerHeight > state.geometry.top + 1
+            && window.scrollY < state.geometry.top + state.geometry.travel + window.innerHeight - 1;
+        dom.body.classList.toggle("scene-asleep", !state.sceneVisible);
+        const hidden = state.geometry.conclusionTop - window.scrollY <= window.innerHeight * 0.78;
         dom.timelineNav.classList.toggle("is-hidden", hidden);
     }
 
@@ -809,15 +838,11 @@ document.addEventListener("DOMContentLoaded", () => {
                     const sinkY = Number(oldB.dataset.ruinY) * Math.pow(scene.degradation, 1.3) * sink;
 
                     oldB.style.transform = `translateY(${sinkY}px) rotate(${angle}deg)`;
-                    oldB.style.filter = performanceProfile.liteEffects
-                        ? "none"
-                        : `grayscale(${clamp(scene.progress * 1.05, 0, 1)}) brightness(${1 - scene.degradation * (0.45 + depth * 0.15)})`;
                     oldB.style.opacity = String(Math.max(0.16, 1 - scene.degradation * (0.52 + depth * 0.16)));
                     oldB.style.setProperty("--damage-opacity", String(clamp(scene.degradation * (0.22 + depth * 0.28), 0, 0.62)));
 
                     ecoB.style.transform = "translateY(120%) scaleY(0.95)";
                     ecoB.style.opacity = "0";
-                    ecoB.style.filter = "none";
                 } else {
                     oldB.style.transform = `translateY(${localProgress * rise}px)`;
                     oldB.style.opacity = String(1 - localProgress);
@@ -825,9 +850,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
                     ecoB.style.transform = `translateY(${(1 - localProgress) * rise}px) scale(${0.98 + localProgress * 0.04})`;
                     ecoB.style.opacity = String(localProgress);
-                    ecoB.style.filter = performanceProfile.liteEffects
-                        ? "none"
-                        : `brightness(${1 + localProgress * 0.06}) saturate(${1.08 + localProgress * 0.14}) drop-shadow(0 0 ${8 + localProgress * 10}px rgba(103,232,249,0.20))`;
                 }
             });
         });
@@ -933,9 +955,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
                 if (scene.scenario === "care") {
                     panel.style.opacity = String(local * 0.96);
-                    panel.style.filter = performanceProfile.liteEffects
-                        ? "none"
-                        : `brightness(${0.96 + local * 0.08}) saturate(${1 + local * 0.12})`;
                 } else {
                     panel.style.opacity = "0";
                 }
@@ -981,8 +1000,8 @@ document.addEventListener("DOMContentLoaded", () => {
         <circle cx="12" cy="40" r="12" fill="#3a6b1f"/>
         <circle cx="28" cy="40" r="12" fill="#3a6b1f"/>
       `;
-            tree.style.width = "0px";
-            tree.style.margin = "0";
+            tree.style.width = "40px";
+            tree.style.margin = "0 2px";
             dom.forest.appendChild(tree);
         }
     }
@@ -1007,15 +1026,11 @@ document.addEventListener("DOMContentLoaded", () => {
             }
 
             if (visible) {
-                tree.style.width = "40px";
-                tree.style.margin = "0 2px";
                 tree.style.opacity = scene.scenario === "ignore"
                     ? String(Math.max(0, 1 - scene.degradation * 1.5))
                     : "1";
                 tree.style.transform = `scale(${currentScale})`;
             } else {
-                tree.style.width = "0px";
-                tree.style.margin = "0";
                 tree.style.opacity = "0";
                 tree.style.transform = "scale(0)";
             }
@@ -1227,10 +1242,10 @@ document.addEventListener("DOMContentLoaded", () => {
     function updateOceanAndMountains(scene) {
         if (scene.scenario === "ignore") {
             const seaLevelRise = scene.degradation * 110;
-            dom.ocean.style.height = `calc(25% + ${seaLevelRise}px)`;
+            dom.ocean.style.transform = `translateY(${-seaLevelRise}px)`;
             dom.ocean.style.background = lerpColor(14, 165, 233, 120, 113, 108, scene.degradation);
         } else {
-            dom.ocean.style.height = "25%";
+            dom.ocean.style.transform = "translateY(0)";
             dom.ocean.style.background = lerpColor(14, 165, 233, 6, 182, 212, scene.progress);
         }
 
@@ -1239,16 +1254,12 @@ document.addEventListener("DOMContentLoaded", () => {
 
     function updateAtmosphere(scene) {
         if (scene.scenario === "ignore") {
-            dom.atmosphere.style.background =
-                scene.degradation > 0.08
-                    ? `linear-gradient(to bottom, rgba(10,10,10,${scene.degradation * 0.35}), rgba(249,115,22,${scene.degradation * 0.2}), transparent)`
-                    : "transparent";
+            dom.atmosphere.style.background = "linear-gradient(to bottom, rgba(10,10,10,.35), rgba(249,115,22,.2), transparent)";
+            dom.atmosphere.style.opacity = String(scene.degradation > 0.08 ? scene.degradation : 0);
             dom.airHaze.style.opacity = clamp((scene.stats.aqi - 40) / 180, 0, 1).toFixed(2);
         } else {
-            dom.atmosphere.style.background =
-                scene.progress > 0.15
-                    ? `linear-gradient(to bottom, rgba(255,255,255,${scene.progress * 0.16}), transparent 45%)`
-                    : "transparent";
+            dom.atmosphere.style.background = "linear-gradient(to bottom, rgba(255,255,255,.16), transparent 45%)";
+            dom.atmosphere.style.opacity = String(scene.progress > 0.15 ? scene.progress : 0);
             dom.airHaze.style.opacity = (clamp((scene.stats.aqi - 40) / 180, 0, 1) * 0.22).toFixed(2);
         }
     }
@@ -1268,13 +1279,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     function updateSky(scene) {
-        dom.visualScene.style.filter = performanceProfile.liteEffects
-            ? "none"
-            : scene.scenario === "ignore"
-                ? `saturate(${1 - scene.degradation * 0.28}) contrast(${1 + scene.degradation * 0.12})`
-                : `saturate(${1.04 + scene.progress * 0.08})`;
-
-        dom.sun.style.top = `calc(42px + ${scene.progress * 180}px)`;
+        dom.sun.style.transform = `translateY(${scene.progress * 180}px)`;
         dom.sun.style.opacity = scene.scenario === "ignore"
             ? String(Math.max(0, 1 - scene.degradation * 0.82))
             : "1";
@@ -1312,12 +1317,14 @@ document.addEventListener("DOMContentLoaded", () => {
             if (scene.scenario === "ignore") {
                 const dead = scene.degradation > 0.18 + index * 0.07;
                 chip.classList.toggle("dead", dead);
-                tagEl.textContent = dead ? "LOST SPECIES" : "AT RISK";
-                emojiEl.textContent = dead ? "☠️" : ANIMALS[index].alive;
+                const tag = dead ? "LOST SPECIES" : "AT RISK";
+                const emoji = dead ? "☠️" : ANIMALS[index].alive;
+                if (tagEl.textContent !== tag) tagEl.textContent = tag;
+                if (emojiEl.textContent !== emoji) emojiEl.textContent = emoji;
             } else {
                 chip.classList.remove("dead");
-                tagEl.textContent = "SAVED SPECIES";
-                emojiEl.textContent = ANIMALS[index].alive;
+                if (tagEl.textContent !== "SAVED SPECIES") tagEl.textContent = "SAVED SPECIES";
+                if (emojiEl.textContent !== ANIMALS[index].alive) emojiEl.textContent = ANIMALS[index].alive;
             }
         });
     }
@@ -1326,6 +1333,7 @@ document.addEventListener("DOMContentLoaded", () => {
         if (state.lightningTimer) clearInterval(state.lightningTimer);
 
         state.lightningTimer = setInterval(() => {
+            if (document.hidden || !state.sceneVisible || performanceProfile.prefersReducedMotion) return;
             const scene = getSceneState(state.year, state.scenario);
             if (scene.scenario !== "ignore") return;
 
@@ -1400,9 +1408,18 @@ document.addEventListener("DOMContentLoaded", () => {
 
     function scrollToYear(targetYear) {
         const progress = clamp((targetYear - START_YEAR) / YEARS, 0, 1);
-        const spacerTop = dom.timelineSpacer.getBoundingClientRect().top + window.scrollY;
-        const scrollPos = spacerTop + progress * (dom.timelineSpacer.offsetHeight - window.innerHeight);
-        window.scrollTo({ top: scrollPos, behavior: "smooth" });
+        const scrollPos = state.geometry.top + progress * state.geometry.travel;
+        window.scrollTo({ top: scrollPos, behavior: performanceProfile.prefersReducedMotion ? "instant" : "smooth" });
+    }
+
+    function updateEffectVisibility() {
+        // Zero-opacity effects otherwise keep consuming animation/compositor work.
+        [dom.fireLayer, dom.steamLayer, dom.ashLayer, dom.faunaLayer, dom.rain,
+            dom.windmillsLayerLeft, dom.windmillsLayerRight, dom.solarFieldLeft,
+            dom.solarFieldRight, dom.desalPlant].forEach(layer => {
+            const hidden = Number(layer.style.opacity || 0) <= 0.001;
+            layer.classList.toggle("effect-idle", hidden);
+        });
     }
 
     function clamp(value, min, max) {
@@ -1426,7 +1443,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
         return {
             liteEffects,
-            renderPrecision: liteEffects ? 2 : 3,
+            prefersReducedMotion,
+            renderPrecision: 4,
             sceneCounts: liteEffects
                 ? { trees: 12, birds: 10, satellites: 4, clouds: 4, steam: 6, ash: 16, rain: 40 }
                 : { trees: 18, birds: 18, satellites: 6, clouds: 7, steam: 10, ash: 34, rain: 90 }

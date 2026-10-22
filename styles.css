@@ -408,7 +408,7 @@ button {
     inset: 0;
     overflow: hidden;
     background: var(--scene-bg);
-    transition: background .8s ease, filter .4s ease;
+    transition: background .8s ease;
 }
 
 .clouds-layer,
@@ -1044,7 +1044,9 @@ body[data-scenario="ignore"] .window {
     left: 0;
     right: 0;
     bottom: 0;
-    height: 25%;
+    /* Extend below the frame so translating the waterline leaves no gap. */
+    height: calc(25% + 110px);
+    bottom: -110px;
     z-index: 18;
     background: #0ea5e9;
 }
@@ -1052,7 +1054,8 @@ body[data-scenario="ignore"] .window {
 .waves {
     position: absolute;
     top: 0;
-    width: 100%;
+    left: -600px;
+    width: calc(100% + 600px);
     height: 20px;
     background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 600 20'%3E%3Cpath d='M0,10 Q150,20 300,10 T600,10 L600,0 L0,0 Z' fill='rgba(255,255,255,0.25)'/%3E%3C/svg%3E");
     background-size: 600px 20px;
@@ -1536,6 +1539,37 @@ body[data-scenario="care"] .result-advice {
     justify-content: center;
 }
 
+.timeline-progress__bar {
+    width: 100%;
+    transform: scaleX(0);
+    transform-origin: left;
+    transition: none;
+}
+
+/* Avoid repeatedly blurring the animated scene behind every glass panel. */
+.milestone-card,
+.stat-card,
+.animal-chip,
+.eco-building {
+    backdrop-filter: none;
+}
+
+.effect-idle { visibility: hidden; }
+.effect-idle *,
+body.scene-asleep .visual-scene *,
+body.scene-asleep .visual-scene *::before,
+body.scene-asleep .visual-scene *::after {
+    animation-play-state: paused !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    html { scroll-behavior: auto; }
+    .visual-scene *, .visual-scene *::before, .visual-scene *::after {
+        animation: none !important;
+        transition: none !important;
+    }
+}
+
 body.lite-effects .experience-controls,
 body.lite-effects .hero-badge,
 body.lite-effects .milestone-card,
@@ -1577,8 +1611,8 @@ body.lite-effects .quiz-container {
 }
 
 @keyframes waveMove {
-    0% { background-position: 0 0; }
-    100% { background-position: 600px 0; }
+    0% { transform: translateX(0); }
+    100% { transform: translateX(600px); }
 }
 
 @keyframes satelliteFly {
