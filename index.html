@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="An interactive climate timeline showing how today's choices shape the world in 2126." />
+    <title>Peek into 2126</title>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Roboto:wght@400;500;700;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css" />
+</head>
+<body data-scenario="ignore">
+
+<audio id="sound-waves" loop preload="none" src="sounds/waves.mp3"></audio>
+<audio id="sound-birds" loop preload="none" src="sounds/birds.mp3"></audio>
+<audio id="sound-wind" loop preload="none" src="sounds/wind.mp3"></audio>
+<audio id="sound-siren" loop preload="none" src="sounds/siren.mp3"></audio>
+<audio id="sound-fire" loop preload="none" src="sounds/fire.mp3"></audio>
+<audio id="sound-thunder" preload="none" src="sounds/thunder.mp3"></audio>
+
+<aside class="timeline-nav" id="timelineNav" aria-label="Timeline navigation">
+    <button class="nav-dot is-active" type="button" data-year="2026" aria-label="Go to 2026"><span>2026</span></button>
+    <button class="nav-dot" type="button" data-year="2050" aria-label="Go to 2050"><span>2050</span></button>
+    <button class="nav-dot" type="button" data-year="2075" aria-label="Go to 2075"><span>2075</span></button>
+    <button class="nav-dot" type="button" data-year="2100" aria-label="Go to 2100"><span>2100</span></button>
+    <button class="nav-dot" type="button" data-year="2126" aria-label="Go to 2126"><span>2126</span></button>
+</aside>
+
+<div class="experience-controls">
+    <button id="muteBtn" class="icon-btn" type="button" aria-pressed="false" title="Toggle sound">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
+            <path id="soundOn" d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path>
+            <line id="soundOff" x1="22" y1="9" x2="16" y2="15"></line>
+            <line id="soundOff2" x1="16" y1="9" x2="22" y2="15"></line>
+        </svg>
+    </button>
+
+    <button id="careBtn" class="toggle-btn" type="button">We care</button>
+    <button id="ignoreBtn" class="toggle-btn is-active" type="button">We don't care</button>
+</div>
+
+<header id="hero" class="hero-section">
+    <div class="hero-content">
+        <p class="hero-kicker">A future storytelling experience</p>
+        <h1 class="hero-title">Peek into 2126</h1>
+        <p class="hero-subtitle">
+            Scroll through the next 100 years and witness how today’s choices shape tomorrow’s world.
+        </p>
+
+        <div class="hero-badge">
+            <p>Start your journey from <span class="highlight-start">2026</span> to <span class="highlight-end">2126</span></p>
+        </div>
+
+        <div class="hero-actions">
+            <button id="scrollToTimeline" class="cta-button primary" type="button">Start the timeline</button>
+        </div>
+    </div>
+
+    <button id="scrollIndicator" class="scroll-indicator" type="button" aria-label="Scroll to timeline">
+        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="6 9 12 15 18 9"></polyline>
+        </svg>
+    </button>
+</header>
+
+<main>
+    <section id="timelineContainer" class="timeline-container">
+        <div class="timeline-progress">
+            <div id="timelineProgressBar" class="timeline-progress__bar"></div>
+        </div>
+
+        <div class="timeline-spacer">
+            <div class="timeline-sticky">
+
+                <div class="year-display">
+                    <p class="eyebrow">Current year</p>
+                    <div id="yearNumber" class="year-number">2026</div>
+                </div>
+
+                <section id="milestoneCard" class="milestone-card">
+                    <div class="milestone-card__top">
+                        <div id="milestoneYear" class="milestone-card__year">2026</div>
+                        <div id="milestoneScenario" class="milestone-card__scenario">Critical decade</div>
+                    </div>
+                    <div class="milestone-card__content">
+                        <h2 id="milestoneTitle">The decisive decade begins</h2>
+                        <p id="milestoneDescription">A few years of action or delay can shape the whole century.</p>
+                    </div>
+                </section>
+
+                <div id="visualScene" class="visual-scene">
+                    <div id="skyOverlay" class="sky-overlay"></div>
+                    <div id="stars" class="stars"></div>
+                    <div id="cloudsLayer" class="clouds-layer"></div>
+                    <div id="satellitesLayer" class="satellites-layer"></div>
+
+                    <div id="atmosphere" class="atmosphere"></div>
+                    <div id="airHaze" class="air-haze"></div>
+                    <div id="horizonGlow" class="horizon-glow"></div>
+                    <div class="sky"></div>
+                    <div id="sun" class="sun"></div>
+
+                    <div id="mountains" class="mountains">
+                        <svg viewBox="0 0 1200 420" preserveAspectRatio="none" class="mountains-svg">
+                            <path d="M0,320 L120,250 L250,290 L380,220 L480,150 L600,90 L720,160 L820,210 L950,270 L1080,190 L1200,280 L1200,420 L0,420 Z" class="mtn far" />
+                            <path d="M0,360 L150,300 L280,380 L420,260 L540,160 L640,110 L760,220 L920,330 L1050,250 L1200,340 L1200,420 L0,420 Z" class="mtn near" />
+                        </svg>
+                    </div>
+
+                    <div class="wind-zone wind-zone-left">
+                        <div id="windmillsLayerLeft" class="windmills-layer"></div>
+                    </div>
+
+                    <div class="wind-zone wind-zone-right">
+                        <div id="windmillsLayerRight" class="windmills-layer"></div>
+                    </div>
+
+                    <div class="solar-zone solar-zone-left">
+                        <div id="solarFieldLeft" class="solar-field"></div>
+                    </div>
+
+                    <div class="solar-zone solar-zone-right">
+                        <div id="solarFieldRight" class="solar-field"></div>
+                    </div>
+
+                    <div class="desal-zone">
+                        <div id="desalPlant" class="desal-plant"></div>
+                    </div>
+
+                    <div id="cityLayer" class="city-layer">
+                        <div id="cityBackLayer" class="city-row city-row-back"></div>
+                        <div id="cityMidLayer" class="city-row city-row-mid"></div>
+                        <div id="cityFrontLayer" class="city-row city-row-front"></div>
+                        <div id="skyBridgesLayer" class="sky-bridges-layer"></div>
+                    </div>
+
+                    <div id="smogLayer" class="smog-layer"></div>
+
+                    <div id="beach" class="beach">
+                        <svg viewBox="0 0 1200 150" preserveAspectRatio="none" class="beach-svg">
+                            <path class="dune back" d="M0,80 Q150,20 300,70 T600,60 T900,80 T1200,50 L1200,150 L0,150 Z" />
+                            <path class="dune middle" d="M0,110 Q200,60 400,100 T800,90 T1200,110 L1200,150 L0,150 Z" />
+                            <path class="dune front" d="M0,140 Q300,100 600,130 T1200,120 L1200,150 L0,150 Z" />
+                        </svg>
+                        <div class="shoreline"></div>
+                    </div>
+
+                    <div id="forest" class="forest"></div>
+
+                    <div id="fire" class="fire-layer"></div>
+                    <div id="steamLayer" class="steam-layer"></div>
+                    <div id="ashLayer" class="ash-layer"></div>
+
+                    <div id="ocean" class="ocean">
+                        <div class="waves"></div>
+                        <div id="faunaLayer" class="fauna-layer"></div>
+                    </div>
+
+                    <div id="rain" class="rain"></div>
+                    <div id="lightning" class="lightning"></div>
+                    <div id="animalShowcase" class="animal-showcase"></div>
+                    <div id="wildlife" class="wildlife"></div>
+                </div>
+
+                <section class="stats-panel">
+                    <div class="stats-grid">
+                        <article class="stat-card" data-stat="co2"><div class="stat-label">CO₂ Level</div><div class="stat-value">425 ppm</div></article>
+                        <article class="stat-card" data-stat="temp"><div class="stat-label">Temp Rise</div><div class="stat-value">+1.3°C</div></article>
+                        <article class="stat-card" data-stat="sea"><div class="stat-label">Sea Rise</div><div class="stat-value">+0 cm</div></article>
+                        <article class="stat-card" data-stat="species"><div class="stat-label">Species</div><div class="stat-value">8.7M</div></article>
+                        <article class="stat-card" data-stat="forest"><div class="stat-label">Forest</div><div class="stat-value">31%</div></article>
+                        <article class="stat-card" data-stat="water"><div class="stat-label">Water</div><div class="stat-value">70%</div></article>
+                        <article class="stat-card" data-stat="aqi"><div class="stat-label">AQI</div><div class="stat-value">85</div></article>
+                    </div>
+
+                    <div class="scenario-indicator">
+                        <span id="scenarioText">⚠️ Scenario: Ignoring Environmental Warnings</span>
+                    </div>
+                </section>
+            </div>
+        </div>
+    </section>
+
+    <section class="conclusion-section">
+        <div class="conclusion-content">
+            <h2 id="conclusionTitle" class="conclusion-title">⚠️ This is the world we created</h2>
+            <p class="conclusion-text">
+                The timeline you just witnessed is not set in stone. The future depends on the choices we make today.
+            </p>
+
+            <div class="action-cards">
+                <a href="https://water.org/" target="_blank" rel="noopener noreferrer" class="action-card">
+                    <div class="action-icon">💧</div>
+                    <h3>Save Water</h3>
+                    <p>Learn how conserving water supports resilience and healthier communities.</p>
+                </a>
+
+                <a href="https://www.plasticpollutioncoalition.org/" target="_blank" rel="noopener noreferrer" class="action-card">
+                    <div class="action-icon">🧴</div>
+                    <h3>Reduce Plastic</h3>
+                    <p>Help reduce pollution in oceans, rivers, and ecosystems.</p>
+                </a>
+
+                <a href="https://teamtrees.org/" target="_blank" rel="noopener noreferrer" class="action-card">
+                    <div class="action-icon">🌳</div>
+                    <h3>Plant Trees</h3>
+                    <p>Support reforestation and habitat restoration for future generations.</p>
+                </a>
+            </div>
+
+            <div class="quiz-container" id="quizContainer">
+                <h3 class="quiz-header">What will YOUR future look like?</h3>
+                <p id="quizIntro">
+                    Answer 5 quick questions to see what kind of Earth your daily habits are helping to build.
+                </p>
+
+                <div id="quizProgressWrap" class="quiz-progress-wrap hidden">
+                    <div class="quiz-progress">
+                        <div id="quizProgressBar" class="quiz-progress__bar"></div>
+                    </div>
+                    <p id="quizStep" class="quiz-step">Question 1 of 5</p>
+                </div>
+
+                <div id="quizApp" class="hidden">
+                    <h4 id="questionText">Question</h4>
+                    <div id="quizOptions" class="quiz-options"></div>
+                </div>
+
+                <div id="quizResult" class="hidden">
+                    <h4 id="resultTitle">Your Earth</h4>
+                    <p id="resultDesc">Result</p>
+                    <div id="resultAdvice" class="result-advice"></div>
+
+                    <div class="quiz-actions-row">
+                        <button id="restartQuizBtn" class="cta-button primary" type="button">Try Again</button>
+                        <button id="shareBtn" class="cta-button secondary" type="button">Share result</button>
+                    </div>
+                </div>
+
+                <button id="startQuizBtn" class="cta-button primary" type="button">Take the Test</button>
+            </div>
+        </div>
+    </section>
+</main>
+
+<script src="script.js"></script>
+</body>
+</html>
